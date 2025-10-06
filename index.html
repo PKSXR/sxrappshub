@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>SatoriXR • TestFlight Fleet</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🟦</text></svg>"
+    />
+
+    <style>
+      /* ------------------------
+       LIGHT THEME (SatoriXR QR)
+    ------------------------- */
+      :root {
+        --bg: #fff7d1;
+        --panel: #ffffff;
+        --line: #e5e2c9; /* hairline separators */
+        --control-border: #d7cf9b; /* stronger control borders (tabs, pills, ghost btn) */
+        --text: #111827; /* base text ~ slate-800 for clarity */
+        --text-muted: #6b7280; /* muted text ~ slate-500 */
+        --thead: #fdf8e0;
+
+        --accent: #0d0d0d; /* black */
+        --accent-2: #eab308; /* gold */
+
+        --chip-live-bg: #22c55e;
+        --chip-live-text: #ffffff;
+        --chip-expiring-bg: #fbbf24;
+        --chip-expiring-text: #111111;
+        --chip-expired-bg: #ef4444;
+        --chip-expired-text: #ffffff;
+        --chip-stash-bg: #9ca3af;
+        --chip-stash-text: #111827;
+      }
+
+      /* ------------------------
+       DARK THEME
+    ------------------------- */
+      html.dark {
+        --bg: #030712;
+        --panel: #0c1221;
+        --line: #1a2337;
+        --control-border: #2c3a57;
+        --text: #f3f4f6; /* ~ slate-100 */
+        --text-muted: #cbd5e1; /* ~ slate-300 */
+        --thead: rgba(255, 255, 255, 0.05);
+
+        --accent: #00f5ff;
+        --accent-2: #6c63ff;
+
+        --chip-live-bg: #16a34a;
+        --chip-live-text: #d1fae5;
+        --chip-expiring-bg: #facc15;
+        --chip-expiring-text: #111111;
+        --chip-expired-bg: #f87171;
+        --chip-expired-text: #111111;
+        --chip-stash-bg: #6b7280;
+        --chip-stash-text: #f1f5f9;
+      }
+      /* === Tabs + Pills ====================== */
+
+      /* ===============================
+   Tabs (Active / Stashed)
+=================================*/
+
+      .tab-btn {
+        font-weight: 600;
+        transition: all 0.25s ease;
+        border: 1px solid var(--control-border);
+        color: var(--text-muted);
+        background: var(--panel);
+        border-radius: 9999px; /* pill shape */
+        padding: 0.4rem 1rem;
+        line-height: 1.2;
+      }
+      .tab-btn:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      /* --- Active tab (Green) --- */
+      .tab-btn.active-active {
+        background: #22c55e;
+        color: #fff !important;
+        border-color: #16a34a;
+        box-shadow: 0 0 5px rgba(34, 197, 94, 0.3);
+      }
+
+      /* --- Stashed tab (Grey) --- */
+      .tab-btn.active-stashed {
+        background: #9ca3af;
+        color: #fff !important;
+        border-color: #6b7280;
+        box-shadow: 0 0 5px rgba(156, 163, 175, 0.3);
+      }
+
+      /* --- Dark mode overrides --- */
+      html.dark .tab-btn.active-active {
+        background: #16a34a;
+        border-color: #22c55e;
+        color: #d1fae5 !important;
+        box-shadow: 0 0 6px rgba(34, 197, 94, 0.4);
+      }
+      html.dark .tab-btn.active-stashed {
+        background: #4b5563;
+        border-color: #6b7280;
+        color: #f1f5f9 !important;
+        box-shadow: 0 0 6px rgba(75, 85, 99, 0.4);
+      }
+
+      /* Pills base */
+      .pill {
+        font-weight: 600;
+        transition: all 0.25s ease;
+        color: var(--text-muted);
+        background: var(--panel);
+        border: 1px solid var(--control-border);
+      }
+      /* Hover for all pills */
+      .pill:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      /* Default 'All' when active (black/gold) */
+      .pill.active {
+        border-color: var(--accent);
+        background: var(--accent);
+        color: #fff;
+      }
+      html.dark .pill.active {
+        background: var(--accent-2);
+        color: #000;
+      }
+
+      /* Type-colored pills */
+      .pill-live {
+        border-color: var(--chip-live-bg);
+      }
+      .pill-expiring {
+        border-color: var(--chip-expiring-bg);
+      }
+      .pill-expired {
+        border-color: var(--chip-expired-bg);
+      }
+
+      /* When selected, fill with matching color */
+      .pill-live.active {
+        background: var(--chip-live-bg);
+        color: var(--chip-live-text);
+        border-color: var(--chip-live-bg);
+      }
+      .pill-expiring.active {
+        background: var(--chip-expiring-bg);
+        color: var(--chip-expiring-text);
+        border-color: var(--chip-expiring-bg);
+      }
+      .pill-expired.active {
+        background: var(--chip-expired-bg);
+        color: var(--chip-expired-text);
+        border-color: var(--chip-expired-bg);
+      }
+
+      /* ------------------------
+       GLOBAL TYPO & SURFACE
+    ------------------------- */
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto,
+          sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+      .bg-panel {
+        background: var(--panel);
+      }
+      .brd {
+        border-color: var(--line);
+      }
+      .brd-ctl {
+        border-color: var(--control-border);
+      } /* controls */
+      .text-muted {
+        color: var(--text-muted);
+      }
+
+      /* Consistent table typography */
+      table th {
+        font-weight: 600;
+        color: var(--text-muted);
+      }
+      table td {
+        font-weight: 500;
+        color: var(--text);
+      } /* steady thickness */
+
+      table thead {
+        background: var(--thead);
+      }
+
+      /* Buttons */
+      .btn {
+        background: var(--accent);
+        color: #fff;
+        border-radius: 10px;
+        transition: 0.2s ease;
+        border: 1px solid transparent;
+      }
+      .btn:hover {
+        background: var(--accent-2);
+        color: #000;
+      }
+      html.dark .btn:hover {
+        color: #0a0f1a;
+      }
+
+      .btn-ghost {
+        background: transparent;
+        border: 1px solid var(--control-border);
+        color: var(--text);
+        border-radius: 10px;
+        transition: 0.2s ease;
+      }
+      .btn-ghost:hover {
+        border-color: var(--accent);
+        color: var(--text);
+        background: transparent;
+      }
+
+      /* Cards */
+      .card {
+        border: 1px solid var(--line);
+        background: var(--panel);
+        border-radius: 12px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+      }
+
+      /* Inputs */
+      .input {
+        border: 1px solid var(--control-border);
+        background: rgba(255, 255, 255, 0.5);
+      }
+      html.dark .input {
+        background: rgba(3, 7, 18, 0.35);
+      }
+
+      /* Chips */
+      .chip {
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 9999px;
+        font-size: 12px;
+        font-weight: 700;
+        line-height: 1.5;
+        letter-spacing: 0.01em;
+      }
+      .chip-live {
+        background: var(--chip-live-bg);
+        color: var(--chip-live-text);
+      }
+      .chip-expiring {
+        background: var(--chip-expiring-bg);
+        color: var(--chip-expiring-text);
+      }
+      .chip-expired {
+        background: var(--chip-expired-bg);
+        color: var(--chip-expired-text);
+      }
+      .chip-stash {
+        background: var(--chip-stash-bg);
+        color: var(--chip-stash-text);
+      }
+
+      /* Rows */
+      .row-hover:hover {
+        background: rgba(0, 0, 0, 0.035);
+      }
+      html.dark .row-hover:hover {
+        background: rgba(255, 255, 255, 0.04);
+      }
+    </style>
+  </head>
+
+  <body class="min-h-full">
+    <!-- Header -->
+    <header class="sticky top-0 z-40 border-b brd bg-panel">
+      <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div class="h-16 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div
+              class="h-9 w-9 rounded-xl btn grid place-items-center shadow-sm"
+            >
+              TF
+            </div>
+            <div>
+              <h1 class="text-lg sm:text-xl font-semibold leading-tight">
+                TestFlight Fleet
+              </h1>
+              <p id="lastRefresh" class="text-xs text-muted">Last refresh: —</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="themeToggle" class="px-4 py-2 btn-ghost brd-ctl">
+              🌙 Dark
+            </button>
+            <button
+              id="refreshBtn"
+              class="px-3 py-2 rounded-xl btn-ghost brd-ctl"
+            >
+              Refresh
+            </button>
+            <button id="btnRequest" class="px-3 py-2 rounded-xl btn">
+              Raise request
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Content -->
+    <main class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <!-- Stat cards -->
+      <section class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div class="card p-4">
+          <p class="text-xs text-muted">Live</p>
+          <p id="count-live" class="mt-1 text-2xl font-semibold">0</p>
+        </div>
+        <div class="card p-4">
+          <p class="text-xs text-muted">Expiring ≤14</p>
+          <p id="count-expiring" class="mt-1 text-2xl font-semibold">0</p>
+        </div>
+        <div class="card p-4">
+          <p class="text-xs text-muted">Expired</p>
+          <p id="count-expired" class="mt-1 text-2xl font-semibold">0</p>
+        </div>
+        <div class="card p-4">
+          <p class="text-xs text-muted">Stashed</p>
+          <p id="count-stashed" class="mt-1 text-2xl font-semibold">0</p>
+        </div>
+      </section>
+
+      <!-- Toolbar -->
+      <section class="card p-3 sm:p-4">
+        <div
+          class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div class="flex items-center gap-4">
+            <!-- Tabs (Active / Stashed) -->
+            <div
+              class="inline-flex tab-group rounded-full border brd-ctl p-1 bg-panel/60 gap-1"
+            >
+              <button
+                id="tab-active"
+                class="tab-btn px-4 py-1.5 text-sm rounded-full active-active"
+              >
+                Active
+              </button>
+              <button
+                id="tab-stashed"
+                class="tab-btn px-4 py-1.5 text-sm rounded-full"
+              >
+                Stashed
+              </button>
+            </div>
+
+            <!-- Filter pills (only for Active tab) -->
+            <div id="filters" class="hidden sm:flex items-center gap-2">
+              <button
+                data-filter=""
+                class="pill active px-3 py-1.5 rounded-full text-xs"
+              >
+                All
+              </button>
+              <button
+                data-filter="Live"
+                class="pill pill-live px-3 py-1.5 rounded-full text-xs"
+              >
+                Live
+              </button>
+              <button
+                data-filter="Expiring ≤14 days"
+                class="pill pill-expiring px-3 py-1.5 rounded-full text-xs"
+              >
+                Expiring
+              </button>
+              <button
+                data-filter="Expired"
+                class="pill pill-expired px-3 py-1.5 rounded-full text-xs"
+              >
+                Expired
+              </button>
+            </div>
+          </div>
+
+          <!-- Search -->
+          <div class="relative w-full sm:w-80">
+            <span
+              class="absolute inset-y-0 left-3 flex items-center pointer-events-none text-muted"
+              >🔎</span
+            >
+            <input
+              id="search"
+              type="text"
+              placeholder="Search app or bundle…"
+              class="input w-full pl-9 pr-3 py-2 rounded-xl focus:outline-none focus:ring-2"
+              style="--tw-ring-color: var(--accent)"
+            />
+          </div>
+        </div>
+      </section>
+
+      <!-- Tables -->
+      <section class="space-y-6">
+        <!-- Active table -->
+        <div id="panel-active" class="card overflow-hidden">
+          <table class="w-full text-sm">
+            <thead>
+              <tr>
+                <th class="text-left px-4 py-3">App</th>
+                <th class="text-left px-4 py-3">Bundle ID</th>
+                <th class="text-left px-4 py-3">Version</th>
+                <th class="text-left px-4 py-3">ASC Status</th>
+                <th class="text-left px-4 py-3">Expires</th>
+                <th class="text-left px-4 py-3">Days Left</th>
+                <th class="text-left px-4 py-3">Bucket</th>
+                <th class="text-left px-4 py-3">Action</th>
+              </tr>
+            </thead>
+            <tbody
+              id="tbody-active"
+              class="divide-y"
+              style="--tw-divide-color: var(--line)"
+            >
+              <!-- rows -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Stashed table -->
+        <div id="panel-stashed" class="card overflow-hidden hidden">
+          <table class="w-full text-sm">
+            <thead>
+              <tr>
+                <th class="text-left px-4 py-3">App</th>
+                <th class="text-left px-4 py-3">Bundle ID</th>
+                <th class="text-left px-4 py-3">Version</th>
+                <th class="text-left px-4 py-3">ASC Status</th>
+                <th class="text-left px-4 py-3">Expires</th>
+                <th class="text-left px-4 py-3">Days Left</th>
+                <th class="text-left px-4 py-3">Bucket</th>
+                <th class="text-left px-4 py-3">Action</th>
+              </tr>
+            </thead>
+            <tbody
+              id="tbody-stashed"
+              class="divide-y"
+              style="--tw-divide-color: var(--line)"
+            >
+              <!-- rows -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <!-- Raise Request Modal -->
+    <div
+      id="reqModal"
+      class="fixed inset-0 bg-black/50 hidden items-center justify-center"
+    >
+      <div class="card w-full max-w-lg p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-semibold">Raise a request</h3>
+          <button id="reqClose" class="text-muted">✕</button>
+        </div>
+        <div class="space-y-4">
+          <label class="block">
+            <span class="text-sm text-muted">Select app *</span>
+            <select
+              id="reqApp"
+              class="input mt-1 w-full rounded-xl px-3 py-2 focus:ring-2"
+              style="--tw-ring-color: var(--accent)"
+            ></select>
+          </label>
+          <label class="block">
+            <span class="text-sm text-muted">Your email (optional)</span>
+            <input
+              id="reqEmail"
+              type="email"
+              placeholder="you@company.com"
+              class="input mt-1 w-full rounded-xl px-3 py-2 focus:ring-2"
+              style="--tw-ring-color: var(--accent)"
+            />
+          </label>
+          <label class="block">
+            <span class="text-sm text-muted">Comments *</span>
+            <textarea
+              id="reqComments"
+              rows="4"
+              class="input mt-1 w-full rounded-xl px-3 py-2 focus:ring-2"
+              style="--tw-ring-color: var(--accent)"
+              placeholder="Describe the issue…"
+            ></textarea>
+          </label>
+        </div>
+        <div class="mt-5 flex justify-end gap-2">
+          <button id="reqCancel" class="px-3 py-2 rounded-xl btn-ghost brd-ctl">
+            Cancel
+          </button>
+          <button id="reqSend" class="px-3 py-2 rounded-xl btn">Send</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="toasts" class="fixed top-4 right-4 space-y-2"></div>
+
+    <script>
+      const el = (id) => document.getElementById(id);
+
+      const tbodyActive = el("tbody-active");
+      const tbodyStashed = el("tbody-stashed");
+      const lastRefresh = el("lastRefresh");
+      const refreshBtn = el("refreshBtn");
+
+      const countLive = el("count-live");
+      const countExpiring = el("count-expiring");
+      const countExpired = el("count-expired");
+      const countStashed = el("count-stashed");
+
+      const tabActive = el("tab-active");
+      const tabStashed = el("tab-stashed");
+      const panelActive = el("panel-active");
+      const panelStashed = el("panel-stashed");
+      const filters = el("filters");
+      const search = el("search");
+
+      const reqModal = el("reqModal");
+      const btnRequest = el("btnRequest");
+      const reqClose = el("reqClose");
+      const reqCancel = el("reqCancel");
+      const reqSend = el("reqSend");
+      const reqApp = el("reqApp");
+      const reqEmail = el("reqEmail");
+      const reqComments = el("reqComments");
+
+      const htmlEl = document.documentElement;
+      const themeBtn = document.getElementById("themeToggle");
+
+      let items = [];
+      let activeFilter = "";
+
+      function toast(msg) {
+        const wrap = el("toasts");
+        const t = document.createElement("div");
+        t.className = "rounded-xl chip text-sm px-3 py-2 shadow";
+        t.textContent = msg;
+        wrap.appendChild(t);
+        setTimeout(() => t.remove(), 1800);
+      }
+
+      function badge(bucket) {
+        if (bucket === "Expired")
+          return `<span class="chip chip-expired">${bucket}</span>`;
+        if (bucket && bucket.startsWith("Expiring"))
+          return `<span class="chip chip-expiring">${bucket}</span>`;
+        if (bucket === "Stashed / Unused")
+          return `<span class="chip chip-stash">Stashed</span>`;
+        return `<span class="chip chip-live">${bucket}</span>`;
+      }
+
+      async function fetchData() {
+        const r = await fetch("/api/apps", { cache: "no-store" });
+        const data = await r.json();
+        lastRefresh.textContent = "Last refresh: " + (data.last_refresh || "—");
+        items = data.items || [];
+      }
+
+      function updateStats() {
+        const live = items.filter((i) => i.bucket === "Live").length;
+        const expg = items.filter(
+          (i) => i.bucket === "Expiring ≤14 days"
+        ).length;
+        const expd = items.filter((i) => i.bucket === "Expired").length;
+        const stash = items.filter(
+          (i) => i.bucket === "Stashed / Unused"
+        ).length;
+        countLive.textContent = live;
+        countExpiring.textContent = expg;
+        countExpired.textContent = expd;
+        countStashed.textContent = stash;
+      }
+
+      function renderTable() {
+        const q = (search.value || "").toLowerCase();
+        const isActiveTab = !panelActive.classList.contains("hidden");
+
+        const list = items.filter((i) => {
+          const text = (i.app_name + " " + i.bundle_id).toLowerCase();
+          const matchesText = text.includes(q);
+          if (isActiveTab) {
+            if (i.bucket === "Stashed / Unused") return false;
+            const matchesBucket = !activeFilter || i.bucket === activeFilter;
+            return matchesText && matchesBucket;
+          } else {
+            return matchesText && i.bucket === "Stashed / Unused";
+          }
+        });
+
+        const rows = list
+          .map((r) => {
+            const actionBtn =
+              r.bucket === "Expired"
+                ? `<button class="px-3 py-1.5 rounded-lg btn-ghost brd-ctl" onclick="stash('${r.bundle_id}', true)">Move to Stashed</button>`
+                : r.bucket === "Stashed / Unused"
+                ? `<button class="px-3 py-1.5 rounded-lg btn-ghost brd-ctl" onclick="stash('${r.bundle_id}', false)">Unstash</button>`
+                : `<span class="text-muted">—</span>`;
+            return `
+          <tr class="row-hover">
+            <td class="px-4 py-3 font-medium">${r.app_name}</td>
+            <td class="px-4 py-3 text-muted">${r.bundle_id}</td>
+            <td class="px-4 py-3">${r.version || "-"}</td>
+            <td class="px-4 py-3">${r.asc_status || "-"}</td>
+            <td class="px-4 py-3">${
+              r.expires ? r.expires.substring(0, 10) : "-"
+            }</td>
+            <td class="px-4 py-3">${r.days_left ?? "-"}</td>
+            <td class="px-4 py-3">${badge(r.bucket)}</td>
+            <td class="px-4 py-3">${actionBtn}</td>
+          </tr>
+        `;
+          })
+          .join("");
+
+        (isActiveTab ? tbodyActive : tbodyStashed).innerHTML =
+          rows ||
+          `
+        <tr><td colspan="8" class="px-4 py-8 text-center text-muted">No apps found.</td></tr>
+      `;
+
+        // Fill request dropdown with ALL apps
+        reqApp.innerHTML = items
+          .map(
+            (i) =>
+              `<option value="${i.bundle_id}">${i.app_name} — ${i.bundle_id}</option>`
+          )
+          .join("");
+      }
+
+      // Expose stash globally (used in onclick)
+      window.stash = async (bundleId, state) => {
+        const r = await fetch("/api/stash", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ bundle_id: bundleId, stashed: !!state }),
+        });
+        if (!r.ok) {
+          toast("Action failed");
+          return;
+        }
+        const data = await r.json();
+        toast(
+          data?.item?.bucket === "Stashed / Unused"
+            ? "Moved to Stashed"
+            : "Unstashed"
+        );
+        await load();
+      };
+
+      async function refreshNow() {
+        refreshBtn.disabled = true;
+        try {
+          await fetch("/api/refresh", { method: "POST" });
+        } catch (e) {
+          console.error(e);
+        }
+        refreshBtn.disabled = false;
+        load();
+      }
+
+      async function load() {
+        await fetchData();
+        updateStats();
+        renderTable();
+      }
+
+      // Tabs
+      function showActive() {
+        // Active Tab → green
+        tabActive.classList.add("active-active");
+        tabStashed.classList.remove("active-stashed");
+        tabStashed.classList.remove("active-active");
+
+        tabActive.classList.add("bg-panel", "border", "brd-ctl");
+        tabStashed.classList.remove("bg-panel", "border", "brd-ctl");
+        tabActive.classList.remove("text-muted");
+        tabStashed.classList.add("text-muted");
+
+        panelActive.classList.remove("hidden");
+        panelStashed.classList.add("hidden");
+        filters.classList.remove("hidden");
+        renderTable();
+      }
+      function showStashed() {
+        // Stashed Tab → grey
+        tabStashed.classList.add("active-stashed");
+        tabActive.classList.remove("active-active");
+        tabActive.classList.remove("active-stashed");
+
+        tabStashed.classList.add("bg-panel", "border", "brd-ctl");
+        tabActive.classList.remove("bg-panel", "border", "brd-ctl");
+        tabStashed.classList.remove("text-muted");
+        tabActive.classList.add("text-muted");
+
+        panelStashed.classList.remove("hidden");
+        panelActive.classList.add("hidden");
+        filters.classList.add("hidden");
+        renderTable();
+      }
+
+      // Filter pills
+      function activatePill(elm) {
+        document.querySelectorAll(".pill").forEach((p) => {
+          p.classList.remove("active");
+          p.classList.remove("ring-2");
+        });
+        elm.classList.add("active");
+        activeFilter = elm.dataset.filter || "";
+        renderTable();
+      }
+
+      // THEME TOGGLE
+      function applyTheme(t) {
+        if (t === "dark") {
+          htmlEl.classList.add("dark");
+          themeBtn.textContent = "☀️ Light";
+        } else {
+          htmlEl.classList.remove("dark");
+          themeBtn.textContent = "🌙 Dark";
+        }
+      }
+      const savedTheme = localStorage.getItem("sx_theme") || "light";
+      applyTheme(savedTheme);
+      themeBtn.addEventListener("click", () => {
+        const next = htmlEl.classList.contains("dark") ? "light" : "dark";
+        localStorage.setItem("sx_theme", next);
+        applyTheme(next);
+      });
+
+      // Modal handlers
+      // const btnRequest = document.getElementById('btnRequest');
+      function openReq() {
+        reqModal.classList.remove("hidden");
+        reqComments.value = "";
+        reqEmail.value = "";
+      }
+      function closeReq() {
+        reqModal.classList.add("hidden");
+      }
+
+      document
+        .querySelectorAll(".pill")
+        .forEach((p) =>
+          p.addEventListener("click", (e) => activatePill(e.currentTarget))
+        );
+      tabActive.addEventListener("click", showActive);
+      tabStashed.addEventListener("click", showStashed);
+      refreshBtn.addEventListener("click", refreshNow);
+      search.addEventListener(
+        "input",
+        debounce(() => renderTable(), 150)
+      );
+
+      btnRequest.addEventListener("click", openReq);
+      reqClose.addEventListener("click", closeReq);
+      reqCancel.addEventListener("click", closeReq);
+      reqSend.addEventListener("click", async () => {
+        const bundle_id = reqApp.value;
+        const comments = (reqComments.value || "").trim();
+        const requester = (reqEmail.value || "").trim();
+        if (!bundle_id || !comments) {
+          toast("Select an app and add comments");
+          return;
+        }
+        const r = await fetch("/api/request", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ bundle_id, comments, requester }),
+        });
+        if (!r.ok) {
+          toast("Failed to send request");
+          return;
+        }
+        toast("Request sent");
+        closeReq();
+      });
+
+      function debounce(fn, ms) {
+        let t;
+        return (...args) => {
+          clearTimeout(t);
+          t = setTimeout(() => fn(...args), ms);
+        };
+      }
+
+      // init
+      showActive();
+      load();
+    </script>
+  </body>
+</html>
