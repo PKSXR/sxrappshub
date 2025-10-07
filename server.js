@@ -158,7 +158,7 @@ function pickLatestReady(builds) {
 }
 
 /* ---------------------------
-   REFRESH PIPELINE
+   REFRESH PIPELINE (daily email lock)
 --------------------------- */
 async function refreshData() {
   if (!hasAscCreds()) {
@@ -169,6 +169,12 @@ async function refreshData() {
   const apps = await listAllApps();
   const prevMap = new Map((store.items || []).map(i => [i.bundle_id, i]));
   const out = [];
+
+  // Make sure meta and alerts exist
+  store.meta = store.meta || {};
+  store.meta.alerts = store.meta.alerts || {};
+
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
 
   for (const appd of apps) {
     const appId = appd.id;
@@ -200,6 +206,36 @@ async function refreshData() {
       ? "Stashed / Unused"
       : (isExpired ? "Expired" : (left !== null && left <= 14 ? "Expiring ≤14 days" : "Live"));
 
+    /* ===============================
+       🔔 Email alert: build expiring soon (only once per day)
+       =============================== */
+    if (transporter && left !== null && left <= 10 && !isExpired) {
+      const alertKey = `${bid}_${version}`; // unique key for each app/version
+      const lastSent = store.meta.alerts[alertKey]?.lastSent || null;
+
+      if (lastSent !== today) { // send only if not sent today
+        try {
+          const subject = `⚠️ TestFlight build expiring in ${left} days: ${name}`;
+          const body = `App: ${name}\nBundle: ${bid}\nVersion: ${version}\nExpires: ${exp}\nDays left: ${left}`;
+          await transporter.sendMail({
+            from: process.env.SMTP_USER,
+            to: process.env.REQUEST_EMAIL_TO,
+            subject,
+            text: body
+          });
+          console.log(`Alert email sent for ${name}`);
+
+          // Save the alert date
+          store.meta.alerts[alertKey] = { lastSent: today };
+          saveData(store);
+        } catch (err) {
+          console.warn(`Alert mail failed for ${name}:`, err.message);
+        }
+      } else {
+        console.log(`Skipped alert for ${name} — already sent today.`);
+      }
+    }
+
     out.push({
       bundle_id: bid,
       app_name: name,
@@ -224,11 +260,11 @@ async function refreshData() {
     return (a.app_name || "").localeCompare(b.app_name || "");
   });
 
-  store.meta = store.meta || {};
   store.meta.last_refresh = new Date().toISOString();
-  store.meta.alerts = store.meta.alerts || {};
   saveData(store);
 }
+
+
 
 // periodic refresh (only if creds exist)
 if (hasAscCreds()) {
