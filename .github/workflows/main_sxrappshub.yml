@@ -1,65 +1,61 @@
-# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
-# More GitHub Actions for Azure: https://github.com/Azure/actions
-
-name: Build and deploy Node.js app to Azure Web App - sxrappshub
+name: Deploy to Azure Web App (sxrappshub)
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   workflow_dispatch:
 
+env:
+  APP_NAME: sxrappshub
+  NODE_VERSION: '20.x'            # use 20.x only if you need it
+
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read #This is required for actions/checkout
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Node.js version
-        uses: actions/setup-node@v3
-        with:
-          node-version: '20.x'
-
-      - name: npm install, build, and test
-        run: |
-          npm install
-          npm run build --if-present
-          npm run test --if-present
-
-      - name: Upload artifact for deployment job
-        uses: actions/upload-artifact@v4
-        with:
-          name: node-app
-          path: .
-
   deploy:
     runs-on: ubuntu-latest
-    needs: build
     permissions:
-      id-token: write #This is required for requesting the JWT
-      contents: read #This is required for actions/checkout
+      id-token: write
+      contents: read
 
     steps:
-      - name: Download artifact from build job
-        uses: actions/download-artifact@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          name: node-app
-      
-      - name: Login to Azure
+          node-version: ${{ env.NODE_VERSION }}
+
+      # Remove any local node_modules; Oryx will install on Azure
+      - name: Clean node_modules
+        run: rm -rf node_modules
+
+      - name: Zip source
+        run: zip -r build.zip . -x "*.git*"
+
+      - name: Azure login (OIDC)
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_A03601777DBA43E1B0195CB4B14FE6C4 }}
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_F0C94E5904FB43FE93DF3322311843E3 }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_1AFC9731986A4D419BD09EFF6CB56307 }}
 
-      - name: 'Deploy to Azure Web App'
-        id: deploy-to-webapp
+      # Optional: push app settings from GitHub Secrets (skip if you set them in the Portal)
+      # - name: Configure App Settings
+      #   run: |
+      #     az webapp config appsettings set -g <YourResourceGroup> -n $APP_NAME --settings \
+      #       SCM_DO_BUILD_DURING_DEPLOYMENT=true \
+      #       ASC_ISSUER_ID='${{ secrets.ASC_ISSUER_ID }}' \
+      #       ASC_KEY_ID='${{ secrets.ASC_KEY_ID }}' \
+      #       ASC_PRIVATE_KEY_BASE64='${{ secrets.ASC_PRIVATE_KEY_BASE64 }}' \
+      #       REQUEST_EMAIL_TO='${{ secrets.REQUEST_EMAIL_TO }}' \
+      #       SMTP_HOST='${{ secrets.SMTP_HOST }}' \
+      #       SMTP_PORT='${{ secrets.SMTP_PORT }}' \
+      #       SMTP_USER='${{ secrets.SMTP_USER }}' \
+      #       SMTP_PASS='${{ secrets.SMTP_PASS }}' \
+      #       SMTP_SECURE='${{ secrets.SMTP_SECURE }}'
+
+      - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
-          app-name: 'sxrappshub'
-          slot-name: 'Production'
-          package: .
-          
+          app-name: ${{ env.APP_NAME }}
+          package: build.zip
