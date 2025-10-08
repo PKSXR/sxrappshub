@@ -1,124 +1,178 @@
-// server.js (ESM) — Azure-ready, safe boot, static index at root
+// server.js
+// Fast App Store Connect refresh service with concurrency, keep-alive, JWT cache, retries, and once-per-day alerts.
+
 import fs from "fs";
 import path from "path";
+import http from "http";
+import https from "https";
+import url from "url";
+
 import express from "express";
 import axios from "axios";
 import jwt from "jsonwebtoken";
 import nodemailer from "nodemailer";
-import { fileURLToPath } from "url";
-import "dotenv/config";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// -------------------------------
+// ENV / CONFIG
+// -------------------------------
+const PORT = Number(process.env.PORT || 3000);
 
-/* ---------------------------
-   ENV / CONFIG
---------------------------- */
-const PORT = process.env.PORT || 8080;
-const REFRESH_INTERVAL_MS = Number(process.env.REFRESH_INTERVAL_MS || 6 * 60 * 60 * 1000); // 6h
-const ONLY_LATEST_PER_APP = true;
-
-const ASC_BASE = "https://api.appstoreconnect.apple.com";
+// App Store Connect (ASC) creds
 const ASC_ISSUER_ID = process.env.ASC_ISSUER_ID || "";
-const ASC_KEY_ID    = process.env.ASC_KEY_ID || "";
+const ASC_KEY_ID = process.env.ASC_KEY_ID || "";
+const ASC_PRIVATE_KEY_TEXT = resolvePrivateKeyText();
+const ASC_BASE = "https://api.appstoreconnect.apple.com";
 
-// Private key: accept raw text, base64, or a file path (works great on Azure)
-const ASC_PRIVATE_KEY_BASE64 = process.env.ASC_PRIVATE_KEY_BASE64 || "";
-const PRIVATE_KEY_P8_PATH    = process.env.ASC_PRIVATE_KEY_P8_PATH || "keys/AuthKey_ABC123XYZ.p8";
-let   PRIVATE_KEY_TEXT       = process.env.ASC_PRIVATE_KEY_P8 || "";
+// Tuning knobs
+const REFRESH_INTERVAL_MS = Number(process.env.REFRESH_INTERVAL_MS || 15 * 60 * 1000); // 15 min
+const ASC_CONCURRENCY = Number(process.env.ASC_CONCURRENCY || 8);
+const HTTP_TIMEOUT_MS = Number(process.env.HTTP_TIMEOUT_MS || 15000);
 
-if (!PRIVATE_KEY_TEXT && ASC_PRIVATE_KEY_BASE64) {
-  try { PRIVATE_KEY_TEXT = Buffer.from(ASC_PRIVATE_KEY_BASE64, "base64").toString("utf8"); } catch {}
+// Storage file
+const DATA_FILE = process.env.DATA_FILE || path.join(process.cwd(), "store.json");
+
+// Email (optional)
+const SMTP_HOST = process.env.SMTP_HOST || "";
+const SMTP_PORT = Number(process.env.SMTP_PORT || 587);
+const SMTP_USER = process.env.SMTP_USER || "";
+const SMTP_PASS = process.env.SMTP_PASS || "";
+const SMTP_SECURE = String(process.env.SMTP_SECURE || "false").toLowerCase() === "true";
+const REQUEST_EMAIL_TO = process.env.REQUEST_EMAIL_TO || "";
+
+// -------------------------------
+/** Resolve ASC private key from one of:
+ *  - ASC_PRIVATE_KEY (raw text with header/footer),
+ *  - ASC_PRIVATE_KEY_B64 (base64-encoded),
+ *  - ASC_PRIVATE_KEY_PATH (file path)
+ */
+function resolvePrivateKeyText() {
+  if (process.env.ASC_PRIVATE_KEY) return process.env.ASC_PRIVATE_KEY;
+  if (process.env.ASC_PRIVATE_KEY_B64) {
+    return Buffer.from(process.env.ASC_PRIVATE_KEY_B64, "base64").toString("utf8");
+  }
+  if (process.env.ASC_PRIVATE_KEY_PATH) {
+    try {
+      return fs.readFileSync(process.env.ASC_PRIVATE_KEY_PATH, "utf8");
+    } catch (e) {
+      console.warn("Could not read ASC_PRIVATE_KEY_PATH:", e.message);
+    }
+  }
+  return "";
 }
-if (!PRIVATE_KEY_TEXT && PRIVATE_KEY_P8_PATH) {
-  try { PRIVATE_KEY_TEXT = fs.readFileSync(path.join(__dirname, PRIVATE_KEY_P8_PATH), "utf-8"); } catch {}
+
+function hasAscCreds() {
+  return Boolean(ASC_ISSUER_ID && ASC_KEY_ID && ASC_PRIVATE_KEY_TEXT);
 }
 
-// Email (SMTP) for /api/request and future alerts
-const REQUEST_EMAIL_TO = process.env.REQUEST_EMAIL_TO || "dev@satorixr.com";
-const SMTP_HOST   = process.env.SMTP_HOST || "";
-const SMTP_PORT   = Number(process.env.SMTP_PORT || 587);
-const SMTP_USER   = process.env.SMTP_USER || "";
-const SMTP_PASS   = process.env.SMTP_PASS || "";
-const SMTP_SECURE = String(process.env.SMTP_SECURE || "false") === "true";
-
-const transporter = (SMTP_HOST && REQUEST_EMAIL_TO)
-  ? nodemailer.createTransport({
-      host: SMTP_HOST,
-      port: SMTP_PORT,
-      secure: SMTP_SECURE, // false for 587 (TLS upgrade)
-      auth: SMTP_USER ? { user: SMTP_USER, pass: SMTP_PASS } : undefined,
-      tls: { ciphers: "TLSv1.2" }
-    })
-  : null;
-
-// Data file (persist on /home in Azure)
-const DATA_DIR  = process.env.DATA_DIR || (process.env.WEBSITE_INSTANCE_ID ? "/home/data" : __dirname);
-try { if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true }); } catch {}
-const DATA_PATH = path.join(DATA_DIR, "data.json");
-
+// -------------------------------
+// Minimal persistent store
+// -------------------------------
 function loadData() {
-  if (!fs.existsSync(DATA_PATH)) return { meta: { alerts: {}, requests: [] }, items: [] };
   try {
-    const j = JSON.parse(fs.readFileSync(DATA_PATH, "utf-8"));
-    j.meta = j.meta || {};
-    j.meta.alerts = j.meta.alerts || {};
-    j.meta.requests = j.meta.requests || [];
-    j.items = j.items || [];
-    return j;
-  } catch {
-    return { meta: { alerts: {}, requests: [] }, items: [] };
+    if (fs.existsSync(DATA_FILE)) {
+      return JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
+    }
+  } catch (e) {
+    console.warn("Failed to read store:", e.message);
+  }
+  return { items: [], meta: { last_refresh: null, alerts: {} } };
+}
+function saveData(obj) {
+  try {
+    fs.writeFileSync(DATA_FILE, JSON.stringify(obj, null, 2));
+  } catch (e) {
+    console.warn("Failed to write store:", e.message);
   }
 }
-function saveData(data) {
-  try { fs.writeFileSync(DATA_PATH, JSON.stringify(data, null, 2)); } catch {}
-}
-let store = loadData();
 
-/* ---------------------------
-   EXPRESS BOOTSTRAP
---------------------------- */
-const app = express();
-app.use(express.json());
-app.use((req, res, next) => { res.set("Cache-Control", "no-store"); next(); });
+const store = loadData();
 
-// serve /public (icons, images) and index.html at root
-app.use("/public", express.static(path.join(__dirname, "public"), { maxAge: "7d" }));
-app.get("/", (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
-
-// health check (for quick diagnostics)
-app.get("/healthz", (_req, res) => res.send("ok"));
-
-// quiet favicon
-app.get("/favicon.ico", (_req, res) => res.status(204).end());
-
-/* ---------------------------
-   ASC HELPERS
---------------------------- */
-function hasAscCreds() {
-  return Boolean(ASC_ISSUER_ID && ASC_KEY_ID && PRIVATE_KEY_TEXT);
+// -------------------------------
+// Optional email transporter
+// -------------------------------
+let transporter = null;
+if (SMTP_HOST && SMTP_USER && SMTP_PASS && REQUEST_EMAIL_TO) {
+  transporter = nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: SMTP_PORT,
+    secure: SMTP_SECURE,
+    auth: { user: SMTP_USER, pass: SMTP_PASS },
+  });
+  transporter.verify().then(
+    () => console.log("SMTP ready."),
+    (err) => console.warn("SMTP not ready:", err?.message || err)
+  );
+} else {
+  console.warn("SMTP not configured — alert emails disabled.");
 }
 
+// -------------------------------
+// Keep-alive HTTP agents + Axios
+// -------------------------------
+const httpsAgent = new https.Agent({
+  keepAlive: true,
+  maxSockets: 64,
+  maxFreeSockets: 16,
+  keepAliveMsecs: 15_000,
+});
+
+const ascHttp = axios.create({
+  baseURL: ASC_BASE,
+  timeout: HTTP_TIMEOUT_MS,
+  httpsAgent,
+});
+
+// -------------------------------
+// ASC JWT (cached)
+// -------------------------------
+let _ascTokenCache = { token: null, expMs: 0 };
 function ascToken() {
-  if (!hasAscCreds()) throw new Error("Set ASC_ISSUER_ID, ASC_KEY_ID and a private key (text/base64/path).");
-  const payload = { iss: ASC_ISSUER_ID, exp: Math.floor(Date.now()/1000) + 20*60, aud: "appstoreconnect-v1" };
-  const header  = { kid: ASC_KEY_ID, alg: "ES256", typ: "JWT" };
-  return jwt.sign(payload, PRIVATE_KEY_TEXT, { algorithm: "ES256", header });
+  if (!hasAscCreds()) {
+    throw new Error("Missing ASC credentials. Set ASC_ISSUER_ID, ASC_KEY_ID, and a private key.");
+  }
+  const now = Date.now();
+  if (_ascTokenCache.token && now < _ascTokenCache.expMs - 30_000) {
+    return _ascTokenCache.token;
+  }
+  const payload = { iss: ASC_ISSUER_ID, exp: Math.floor(now / 1000) + 20 * 60, aud: "appstoreconnect-v1" };
+  const header = { kid: ASC_KEY_ID, alg: "ES256", typ: "JWT" };
+  const token = jwt.sign(payload, ASC_PRIVATE_KEY_TEXT, { algorithm: "ES256", header });
+  _ascTokenCache = { token, expMs: now + 20 * 60 * 1000 };
+  return token;
 }
 
+// Attach token per request
+ascHttp.interceptors.request.use((cfg) => {
+  cfg.headers = cfg.headers || {};
+  cfg.headers.Authorization = `Bearer ${ascToken()}`;
+  return cfg;
+});
+
+// Simple retry with backoff for 429/5xx/timeouts
+async function withRetry(fn, { tries = 3, baseDelay = 500 } = {}) {
+  let lastErr;
+  for (let i = 0; i < tries; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      const status = err?.response?.status;
+      if (status === 429 || (status >= 500 && status < 600) || err.code === "ECONNABORTED") {
+        await new Promise((r) => setTimeout(r, baseDelay * Math.pow(2, i)));
+        continue;
+      }
+      break;
+    }
+  }
+  throw lastErr;
+}
+
+// -------------------------------
+// ASC helpers (paginated)
+// -------------------------------
 async function ascGet(url, params = {}) {
-  const token = ascToken();
-  const r = await axios.get(ASC_BASE + url, { headers: { Authorization: `Bearer ${token}` }, params, timeout: 30000 });
-  return r.data;
-}
-
-function daysLeft(iso) {
-  if (!iso) return null;
-  const d = new Date(iso);
-  const today = new Date();
-  const utc0 = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
-  const utcD = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
-  return Math.round((utcD - utc0) / 86400000);
+  const { data } = await withRetry(() => ascHttp.get(url, { params }));
+  return data;
 }
 
 async function listAllApps() {
@@ -126,10 +180,9 @@ async function listAllApps() {
   const apps = [...data.data];
   let next = data.links?.next;
   while (next) {
-    const r = await axios.get(next, { headers: { Authorization: `Bearer ${ascToken()}` } });
-    data = r.data;
-    apps.push(...data.data);
-    next = data.links?.next;
+    const { data: page } = await withRetry(() => ascHttp.get(next));
+    apps.push(...page.data);
+    next = page.links?.next;
   }
   return apps;
 }
@@ -137,55 +190,85 @@ async function listAllApps() {
 async function listBuilds(appId) {
   let data = await ascGet(`/v1/apps/${appId}/builds`, {
     limit: 200,
-    "fields[builds]": "version,uploadedDate,expirationDate,expired,processingState"
+    "fields[builds]": "version,uploadedDate,expirationDate,expired,processingState",
   });
   const builds = [...data.data];
   let next = data.links?.next;
   while (next) {
-    const r = await axios.get(next, { headers: { Authorization: `Bearer ${ascToken()}` } });
-    data = r.data;
-    builds.push(...data.data);
-    next = data.links?.next;
+    const { data: page } = await withRetry(() => ascHttp.get(next));
+    builds.push(...page.data);
+    next = page.links?.next;
   }
   return builds;
 }
 
-function pickLatestReady(builds) {
-  const ready = builds.filter(b => b.attributes?.processingState === "VALID");
-  const pool = (ONLY_LATEST_PER_APP && ready.length) ? ready : builds;
-  if (!pool.length) return null;
-  return pool.sort((a, b) => (b.attributes?.uploadedDate || "").localeCompare(a.attributes?.uploadedDate || ""))[0];
+// -------------------------------
+// Utility helpers
+// -------------------------------
+function daysLeft(iso) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const ms = d.getTime() - Date.now();
+  return Math.ceil(ms / (24 * 3600 * 1000));
 }
 
-/* ---------------------------
-   REFRESH PIPELINE (daily email lock)
---------------------------- */
+function pickLatestReady(builds) {
+  // Prefer a "ready for testing" / processed build; fallback to most recent uploaded
+  const arr = Array.isArray(builds) ? builds : [];
+  const sorted = [...arr].sort((a, b) => {
+    const ad = new Date(a?.attributes?.uploadedDate || 0).getTime();
+    const bd = new Date(b?.attributes?.uploadedDate || 0).getTime();
+    return bd - ad;
+  });
+  // If processingState exists, prefer the earliest READY among newest
+  const ready = sorted.find((b) => (b?.attributes?.processingState || "").toLowerCase() === "processed");
+  return ready || sorted[0] || null;
+}
+
+async function mapWithConcurrency(items, concurrency, worker) {
+  const results = new Array(items.length);
+  let idx = 0;
+  const workers = Array(Math.min(concurrency, items.length))
+    .fill(0)
+    .map(async () => {
+      while (true) {
+        const i = idx++;
+        if (i >= items.length) break;
+        results[i] = await worker(items[i], i);
+      }
+    });
+  await Promise.all(workers);
+  return results;
+}
+
+// -------------------------------
+// Refresh Pipeline
+// -------------------------------
 async function refreshData() {
   if (!hasAscCreds()) {
     console.warn("ASC creds missing — skipping refresh.");
     return;
   }
 
+  console.time("refreshData");
   const apps = await listAllApps();
-  const prevMap = new Map((store.items || []).map(i => [i.bundle_id, i]));
-  const out = [];
 
-  // Make sure meta and alerts exist
+  const prevMap = new Map((store.items || []).map((i) => [i.bundle_id, i]));
   store.meta = store.meta || {};
   store.meta.alerts = store.meta.alerts || {};
-
   const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
 
-  for (const appd of apps) {
+  const rows = await mapWithConcurrency(apps, ASC_CONCURRENCY, async (appd) => {
     const appId = appd.id;
-    const name  = appd.attributes?.name;
-    const bid   = appd.attributes?.bundleId;
+    const name = appd.attributes?.name;
+    const bid = appd.attributes?.bundleId;
 
     const builds = await listBuilds(appId);
-    if (!builds.length) continue;
+    if (!builds.length) return null;
 
     const b = pickLatestReady(builds);
-    if (!b) continue;
+    if (!b) return null;
 
     const a = b.attributes || {};
     const exp = a.expirationDate || null;
@@ -195,66 +278,68 @@ async function refreshData() {
     const uploaded = a.uploadedDate || null;
     const version = a.version || null;
 
-    // Preserve "stashed", but auto-unstash if it goes live/expiring
+    // Preserve manual stash; auto-unstash if now live/non-expiring
     let stashed = prevMap.get(bid)?.stashed ? 1 : 0;
     if (stashed && !isExpired) {
       stashed = 0;
-      console.log(`Auto-unstashed: ${name} (${bid}) now Live/Expiring`);
+      console.log(`Auto-unstashed: ${name} (${bid})`);
     }
 
     const bucket = stashed
       ? "Stashed / Unused"
-      : (isExpired ? "Expired" : (left !== null && left <= 14 ? "Expiring ≤14 days" : "Live"));
+      : isExpired
+      ? "Expired"
+      : left !== null && left <= 14
+      ? "Expiring ≤14 days"
+      : "Live";
 
-    /* ===============================
-       🔔 Email alert: build expiring soon (only once per day)
-       =============================== */
+    // Once-per-day expiry alert (if SMTP configured)
     if (transporter && left !== null && left <= 10 && !isExpired) {
-      const alertKey = `${bid}_${version}`; // unique key for each app/version
+      const alertKey = `${bid}_${version}`;
       const lastSent = store.meta.alerts[alertKey]?.lastSent || null;
-
-      if (lastSent !== today) { // send only if not sent today
+      if (lastSent !== today) {
         try {
           const subject = `⚠️ TestFlight build expiring in ${left} days: ${name}`;
-          const body = `App: ${name}\nBundle: ${bid}\nVersion: ${version}\nExpires: ${exp}\nDays left: ${left}`;
+          const body =
+            `App: ${name}\nBundle: ${bid}\nVersion: ${version}\n` +
+            `Expires: ${exp}\nDays left: ${left}\nStatus: ${status || "n/a"}`;
           await transporter.sendMail({
-            from: process.env.SMTP_USER,
-            to: process.env.REQUEST_EMAIL_TO,
+            from: SMTP_USER,
+            to: REQUEST_EMAIL_TO,
             subject,
-            text: body
+            text: body,
           });
-          console.log(`Alert email sent for ${name}`);
-
-          // Save the alert date
           store.meta.alerts[alertKey] = { lastSent: today };
           saveData(store);
         } catch (err) {
           console.warn(`Alert mail failed for ${name}:`, err.message);
         }
-      } else {
-        console.log(`Skipped alert for ${name} — already sent today.`);
       }
     }
 
-    out.push({
+    return {
       bundle_id: bid,
       app_name: name,
-      version, uploaded, expires: exp,
-      days_left: left, asc_status: status,
+      version,
+      uploaded,
+      expires: exp,
+      days_left: left,
+      asc_status: status,
       expired: isExpired ? 1 : 0,
-      bucket, stashed,
-      updated_at: new Date().toISOString()
-    });
-  }
+      bucket,
+      stashed,
+      updated_at: new Date().toISOString(),
+    };
+  });
 
-  // sort: Expired → Expiring → Live → Stashed
+  const out = rows.filter(Boolean);
+
+  // Stable sort: Expired → Expiring → Live → Stashed
   const orderRank = (x) =>
-    x.bucket === "Expired" ? 0 :
-    x.bucket.startsWith("Expiring") ? 1 :
-    x.bucket === "Live" ? 2 : 3;
-
+    x.bucket === "Expired" ? 0 : x.bucket.startsWith("Expiring") ? 1 : x.bucket === "Live" ? 2 : 3;
   store.items = out.sort((a, b) => {
-    const ra = orderRank(a), rb = orderRank(b);
+    const ra = orderRank(a),
+      rb = orderRank(b);
     if (ra !== rb) return ra - rb;
     if ((a.days_left ?? 999) !== (b.days_left ?? 999)) return (a.days_left ?? 999) - (b.days_left ?? 999);
     return (a.app_name || "").localeCompare(b.app_name || "");
@@ -262,104 +347,70 @@ async function refreshData() {
 
   store.meta.last_refresh = new Date().toISOString();
   saveData(store);
+  console.timeEnd("refreshData");
 }
 
-
-
-// periodic refresh (only if creds exist)
-if (hasAscCreds()) {
-  setInterval(() => refreshData().catch(e => console.error("Refresh failed:", e.message)), REFRESH_INTERVAL_MS);
+// -------------------------------
+// Express app
+// -------------------------------
+const app = express();
+app.set("etag", "strong");
+// Optional gzip (doesn't crash if not installed)
+try {
+  const { default: compression } = await import("compression");
+  app.use(compression());
+  console.log("Using gzip compression.");
+} catch {
+  console.warn("compression not installed — skipping gzip (npm i compression)");
 }
 
-/* ---------------------------
-   ROUTES
---------------------------- */
+app.use(express.json());
+
+// Health
+app.get("/health", (_req, res) => res.json({ ok: true, last_refresh: store.meta?.last_refresh || null }));
+
+// Current app/build view
 app.get("/api/apps", (_req, res) => {
-  res.json({ last_refresh: store.meta?.last_refresh || null, items: store.items || [] });
-});
-
-app.post("/api/stash", (req, res) => {
-  const { bundle_id, stashed } = req.body || {};
-  if (!bundle_id) return res.status(400).json({ error: "bundle_id required" });
-
-  let updated = null;
-  store.items = (store.items || []).map(i => {
-    if (i.bundle_id !== bundle_id) return i;
-    const newStashed = stashed ? 1 : 0;
-    const bucket = newStashed
-      ? "Stashed / Unused"
-      : (i.expired ? "Expired" : (i.days_left !== null && i.days_left <= 14 ? "Expiring ≤14 days" : "Live"));
-    updated = { ...i, stashed: newStashed, bucket, updated_at: new Date().toISOString() };
-    return updated;
+  res.json({
+    items: store.items || [],
+    meta: store.meta || {},
   });
-  saveData(store);
-  return res.json({ ok: true, item: updated });
 });
 
-app.post("/api/request", async (req, res) => {
-  const { bundle_id, comments, requester } = req.body || {};
-  if (!bundle_id || !comments) return res.status(400).json({ error: "bundle_id and comments are required" });
-  if (!transporter) return res.status(500).json({ error: "Email transporter not configured (SMTP)." });
-
-  const appItem = (store.items || []).find(i => i.bundle_id === bundle_id);
-  const appName = appItem?.app_name || "(Unknown App)";
-  const version = appItem?.version || "-";
-  const bucket  = appItem?.bucket || "-";
-  const expires = appItem?.expires ? new Date(appItem.expires).toISOString().slice(0,10) : "-";
-  const daysLeft = appItem?.days_left ?? "-";
-
-  store.meta.requests = store.meta.requests || [];
-  store.meta.requests.push({
-    at: new Date().toISOString(),
-    bundle_id, app_name: appName, version, bucket,
-    requester: requester || "",
-    comments
-  });
-  saveData(store);
-
-  const subject = `TestFlight Request: ${appName} (${bundle_id})`;
-  const lines = [
-    `App: ${appName}`,
-    `Bundle ID: ${bundle_id}`,
-    `Version: ${version}`,
-    `Status: ${bucket}`,
-    `Expires: ${expires} (Days left: ${daysLeft})`,
-    requester ? `Requester: ${requester}` : null,
-    `---`,
-    `Comments:`,
-    comments
-  ].filter(Boolean);
-
-  try {
-    await transporter.sendMail({
-      from: SMTP_USER || "testflight-requests@yourdomain.com",
-      to: REQUEST_EMAIL_TO,
-      subject,
-      text: lines.join("\n")
-    });
-    return res.json({ ok: true, sent: true });
-  } catch (e) {
-    console.error("Request email failed:", e.message);
-    return res.status(500).json({ error: "Failed to send email" });
-  }
-});
-
+// Manual refresh trigger
 app.post("/api/refresh", async (_req, res) => {
   try {
     await refreshData();
-    res.json({ ok: true, refreshed: store.meta?.last_refresh || null });
+    res.json({ ok: true, last_refresh: store.meta?.last_refresh || null, count: store.items?.length || 0 });
   } catch (e) {
-    res.status(500).json({ ok: false, error: e.message });
+    console.error("Manual refresh failed:", e?.message || e);
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
   }
 });
 
-/* ---------------------------
-   START
---------------------------- */
+// Toggle stash (optional helper)
+app.post("/api/stash/:bundleId", (req, res) => {
+  const bid = req.params.bundleId;
+  const item = (store.items || []).find((x) => x.bundle_id === bid);
+  if (!item) return res.status(404).json({ ok: false, error: "Bundle not found" });
+  item.stashed = item.stashed ? 0 : 1;
+  item.bucket = item.stashed ? "Stashed / Unused" : "Live";
+  item.updated_at = new Date().toISOString();
+  saveData(store);
+  res.json({ ok: true, item });
+});
+
+// -------------------------------
+// Boot
+// -------------------------------
 app.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT} (Azure will proxy the public URL)`);
-  // Kick an initial refresh only if we actually have creds; otherwise wait for /api/refresh
-  if (hasAscCreds()) {
-    refreshData().catch(err => console.warn("Initial refresh failed:", err.message));
-  }
+  console.log(`Server listening on :${PORT}`);
+  // Kick off an initial refresh shortly after boot
+  setTimeout(() => {
+    refreshData().catch((e) => console.warn("Initial refresh failed:", e?.message || e));
+  }, 1000);
+  // Schedule periodic refresh
+  setInterval(() => {
+    refreshData().catch((e) => console.warn("Scheduled refresh failed:", e?.message || e));
+  }, REFRESH_INTERVAL_MS);
 });
