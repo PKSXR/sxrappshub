@@ -47,6 +47,9 @@ const SMTP_USER   = process.env.SMTP_USER || "";
 const SMTP_PASS   = process.env.SMTP_PASS || "";
 const SMTP_SECURE = String(process.env.SMTP_SECURE || "false") === "true";
 
+// Stash password protection
+const STASH_PASSWORD = process.env.STASH_PASSWORD || "admin123"; // Change this!
+
 const transporter = (SMTP_HOST && REQUEST_EMAIL_TO)
   ? nodemailer.createTransport({
       host: SMTP_HOST,
@@ -86,6 +89,28 @@ const requestCache = new Map(); // cache recent requests
 const CACHE_TTL = 30 * 1000; // 30 seconds
 let isRefreshing = false;
 let lastFullRefresh = 0;
+
+// Session management for stash auth
+const sessions = new Map(); // sessionId -> { timestamp }
+const SESSION_DURATION = 30 * 60 * 1000; // 30 minutes
+
+function generateSessionId() {
+  return Math.random().toString(36).substring(2) + Date.now().toString(36);
+}
+
+function validateSession(sessionId) {
+  if (!sessionId) return false;
+  const session = sessions.get(sessionId);
+  if (!session) return false;
+  
+  // Check if session expired
+  if (Date.now() - session.timestamp > SESSION_DURATION) {
+    sessions.delete(sessionId);
+    return false;
+  }
+  
+  return true;
+}
 
 /* ---------------------------
    EXPRESS BOOTSTRAP
@@ -406,6 +431,28 @@ if (hasAscCreds()) {
 /* ---------------------------
    ROUTES
 --------------------------- */
+// Verify stash password
+app.post("/api/verify-stash", (req, res) => {
+  const { password } = req.body || {};
+  
+  if (password === STASH_PASSWORD) {
+    const sessionId = generateSessionId();
+    sessions.set(sessionId, { timestamp: Date.now() });
+    
+    // Clean up old sessions
+    const now = Date.now();
+    for (const [id, session] of sessions.entries()) {
+      if (now - session.timestamp > SESSION_DURATION) {
+        sessions.delete(id);
+      }
+    }
+    
+    return res.json({ ok: true, sessionId });
+  }
+  
+  return res.status(401).json({ error: "Invalid password" });
+});
+
 app.get("/api/apps", (_req, res) => {
   res.json({ 
     last_refresh: store.meta?.last_refresh || null, 
@@ -415,8 +462,13 @@ app.get("/api/apps", (_req, res) => {
 });
 
 app.post("/api/stash", (req, res) => {
-  const { bundle_id, stashed } = req.body || {};
+  const { bundle_id, stashed, sessionId } = req.body || {};
   if (!bundle_id) return res.status(400).json({ error: "bundle_id required" });
+  
+  // Verify session
+  if (!validateSession(sessionId)) {
+    return res.status(401).json({ error: "Unauthorized - invalid or expired session" });
+  }
 
   let updated = null;
   store.items = (store.items || []).map(i => {
@@ -523,6 +575,7 @@ app.listen(PORT, () => {
   console.log(`⚙️  Full refresh: every ${REFRESH_INTERVAL_MS/1000}s`);
   console.log(`⚡ Quick check: every ${QUICK_CHECK_INTERVAL_MS/1000}s`);
   console.log(`🔀 Parallel requests: ${MAX_PARALLEL_REQUESTS}`);
+  console.log(`🔒 Stash protection: ${STASH_PASSWORD === 'admin123' ? '⚠️  Using default password! Change STASH_PASSWORD env var' : 'enabled'}`);
   
   if (hasAscCreds()) {
     refreshData().catch(err => console.warn("Initial refresh failed:", err.message));

@@ -14,14 +14,14 @@
       :root {
         --bg: #fff7d1;
         --panel: #ffffff;
-        --line: #e5e2c9; /* hairline separators */
-        --control-border: #d7cf9b; /* stronger control borders (tabs, pills, ghost btn) */
-        --text: #111827; /* base text ~ slate-800 for clarity */
-        --text-muted: #6b7280; /* muted text ~ slate-500 */
+        --line: #e5e2c9;
+        --control-border: #d7cf9b;
+        --text: #111827;
+        --text-muted: #6b7280;
         --thead: #fdf8e0;
 
-        --accent: #0d0d0d; /* black */
-        --accent-2: #eab308; /* gold */
+        --accent: #0d0d0d;
+        --accent-2: #eab308;
 
         --chip-live-bg: #22c55e;
         --chip-live-text: #ffffff;
@@ -41,8 +41,8 @@
         --panel: #0c1221;
         --line: #1a2337;
         --control-border: #2c3a57;
-        --text: #f3f4f6; /* ~ slate-100 */
-        --text-muted: #cbd5e1; /* ~ slate-300 */
+        --text: #f3f4f6;
+        --text-muted: #cbd5e1;
         --thead: rgba(255, 255, 255, 0.05);
 
         --accent: #00f5ff;
@@ -57,11 +57,6 @@
         --chip-stash-bg: #6b7280;
         --chip-stash-text: #f1f5f9;
       }
-      /* === Tabs + Pills ====================== */
-
-      /* ===============================
-   Tabs (Active / Stashed)
-=================================*/
 
       .tab-btn {
         font-weight: 600;
@@ -69,7 +64,7 @@
         border: 1px solid var(--control-border);
         color: var(--text-muted);
         background: var(--panel);
-        border-radius: 9999px; /* pill shape */
+        border-radius: 9999px;
         padding: 0.4rem 1rem;
         line-height: 1.2;
       }
@@ -78,7 +73,6 @@
         color: var(--accent);
       }
 
-      /* --- Active tab (Green) --- */
       .tab-btn.active-active {
         background: #22c55e;
         color: #fff !important;
@@ -86,7 +80,6 @@
         box-shadow: 0 0 5px rgba(34, 197, 94, 0.3);
       }
 
-      /* --- Stashed tab (Grey) --- */
       .tab-btn.active-stashed {
         background: #9ca3af;
         color: #fff !important;
@@ -94,7 +87,6 @@
         box-shadow: 0 0 5px rgba(156, 163, 175, 0.3);
       }
 
-      /* --- Dark mode overrides --- */
       html.dark .tab-btn.active-active {
         background: #16a34a;
         border-color: #22c55e;
@@ -108,7 +100,6 @@
         box-shadow: 0 0 6px rgba(75, 85, 99, 0.4);
       }
 
-      /* Pills base */
       .pill {
         font-weight: 600;
         transition: all 0.25s ease;
@@ -116,13 +107,11 @@
         background: var(--panel);
         border: 1px solid var(--control-border);
       }
-      /* Hover for all pills */
       .pill:hover {
         border-color: var(--accent);
         color: var(--accent);
       }
 
-      /* Default 'All' when active (black/gold) */
       .pill.active {
         border-color: var(--accent);
         background: var(--accent);
@@ -133,7 +122,6 @@
         color: #000;
       }
 
-      /* Type-colored pills */
       .pill-live {
         border-color: var(--chip-live-bg);
       }
@@ -144,7 +132,6 @@
         border-color: var(--chip-expired-bg);
       }
 
-      /* When selected, fill with matching color */
       .pill-live.active {
         background: var(--chip-live-bg);
         color: var(--chip-live-text);
@@ -161,9 +148,6 @@
         border-color: var(--chip-expired-bg);
       }
 
-      /* ------------------------
-       GLOBAL TYPO & SURFACE
-    ------------------------- */
       body {
         background: var(--bg);
         color: var(--text);
@@ -180,12 +164,11 @@
       }
       .brd-ctl {
         border-color: var(--control-border);
-      } /* controls */
+      }
       .text-muted {
         color: var(--text-muted);
       }
 
-      /* Consistent table typography */
       table th {
         font-weight: 600;
         color: var(--text-muted);
@@ -193,13 +176,11 @@
       table td {
         font-weight: 500;
         color: var(--text);
-      } /* steady thickness */
-
+      }
       table thead {
         background: var(--thead);
       }
 
-      /* Buttons */
       .btn {
         background: var(--accent);
         color: #fff;
@@ -228,7 +209,6 @@
         background: transparent;
       }
 
-      /* Cards */
       .card {
         border: 1px solid var(--line);
         background: var(--panel);
@@ -236,7 +216,6 @@
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
       }
 
-      /* Inputs */
       .input {
         border: 1px solid var(--control-border);
         background: rgba(255, 255, 255, 0.5);
@@ -245,7 +224,6 @@
         background: rgba(3, 7, 18, 0.35);
       }
 
-      /* Chips */
       .chip {
         display: inline-block;
         padding: 2px 10px;
@@ -272,18 +250,57 @@
         color: var(--chip-stash-text);
       }
 
-      /* Rows */
       .row-hover:hover {
         background: rgba(0, 0, 0, 0.035);
       }
       html.dark .row-hover:hover {
         background: rgba(255, 255, 255, 0.04);
       }
+
+      .modal-overlay {
+        backdrop-filter: blur(4px);
+        animation: fadeIn 0.2s ease;
+      }
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+
+      /* Toast animations */
+      @keyframes slideIn {
+        from {
+          transform: translateX(100%);
+          opacity: 0;
+        }
+        to {
+          transform: translateX(0);
+          opacity: 1;
+        }
+      }
+
+      @keyframes slideOut {
+        from {
+          transform: translateX(0);
+          opacity: 1;
+        }
+        to {
+          transform: translateX(100%);
+          opacity: 0;
+        }
+      }
+
+      .toast-item {
+        margin-bottom: 0.5rem;
+        transition: all 0.3s ease;
+      }
     </style>
   </head>
 
   <body class="min-h-full">
-    <!-- Header -->
     <header class="sticky top-0 z-40 border-b brd bg-panel">
       <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div class="h-16 flex items-center justify-between">
@@ -316,9 +333,7 @@
       </div>
     </header>
 
-    <!-- Content -->
     <main class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-      <!-- Stat cards -->
       <section class="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div class="card p-4">
           <p class="text-xs text-muted">Live</p>
@@ -338,13 +353,11 @@
         </div>
       </section>
 
-      <!-- Toolbar -->
       <section class="card p-3 sm:p-4">
         <div
           class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
         >
           <div class="flex items-center gap-4">
-            <!-- Tabs (Active / Stashed) -->
             <div
               class="inline-flex tab-group rounded-full border brd-ctl p-1 bg-panel/60 gap-1"
             >
@@ -362,7 +375,6 @@
               </button>
             </div>
 
-            <!-- Filter pills (only for Active tab) -->
             <div id="filters" class="hidden sm:flex items-center gap-2">
               <button
                 data-filter=""
@@ -391,7 +403,6 @@
             </div>
           </div>
 
-          <!-- Search -->
           <div class="relative w-full sm:w-80">
             <span
               class="absolute inset-y-0 left-3 flex items-center pointer-events-none text-muted"
@@ -408,9 +419,7 @@
         </div>
       </section>
 
-      <!-- Tables -->
       <section class="space-y-6">
-        <!-- Active table -->
         <div id="panel-active" class="card overflow-hidden">
           <table class="w-full text-sm">
             <thead>
@@ -429,13 +438,10 @@
               id="tbody-active"
               class="divide-y"
               style="--tw-divide-color: var(--line)"
-            >
-              <!-- rows -->
-            </tbody>
+            ></tbody>
           </table>
         </div>
 
-        <!-- Stashed table -->
         <div id="panel-stashed" class="card overflow-hidden hidden">
           <table class="w-full text-sm">
             <thead>
@@ -454,18 +460,58 @@
               id="tbody-stashed"
               class="divide-y"
               style="--tw-divide-color: var(--line)"
-            >
-              <!-- rows -->
-            </tbody>
+            ></tbody>
           </table>
         </div>
       </section>
     </main>
 
+    <!-- Password Modal for Stash/Unstash -->
+    <div
+      id="authModal"
+      class="modal-overlay fixed inset-0 bg-black/50 hidden items-center justify-center z-50"
+    >
+      <div class="card w-full max-w-md p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-semibold">🔒 Authorization Required</h3>
+          <button id="authClose" class="text-muted hover:text-red-500">
+            ✕
+          </button>
+        </div>
+        <p class="text-sm text-muted mb-4">
+          Enter password to stash/unstash applications
+        </p>
+        <div class="space-y-4">
+          <label class="block">
+            <span class="text-sm text-muted">Password *</span>
+            <input
+              id="authPassword"
+              type="password"
+              placeholder="Enter password"
+              class="input mt-1 w-full rounded-xl px-3 py-2 focus:ring-2"
+              style="--tw-ring-color: var(--accent)"
+            />
+          </label>
+          <div id="authError" class="text-sm text-red-500 hidden"></div>
+        </div>
+        <div class="mt-5 flex justify-end gap-2">
+          <button
+            id="authCancel"
+            class="px-3 py-2 rounded-xl btn-ghost brd-ctl"
+          >
+            Cancel
+          </button>
+          <button id="authSubmit" class="px-3 py-2 rounded-xl btn">
+            Verify
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Raise Request Modal -->
     <div
       id="reqModal"
-      class="fixed inset-0 bg-black/50 hidden items-center justify-center"
+      class="modal-overlay fixed inset-0 bg-black/50 hidden items-center justify-center z-50"
     >
       <div class="card w-full max-w-lg p-6">
         <div class="flex items-center justify-between mb-4">
@@ -511,7 +557,7 @@
       </div>
     </div>
 
-    <div id="toasts" class="fixed top-4 right-4 space-y-2"></div>
+    <div id="toasts" class="fixed top-4 right-4 space-y-2 z-50"></div>
 
     <script>
       const el = (id) => document.getElementById(id);
@@ -533,6 +579,13 @@
       const filters = el("filters");
       const search = el("search");
 
+      const authModal = el("authModal");
+      const authClose = el("authClose");
+      const authCancel = el("authCancel");
+      const authSubmit = el("authSubmit");
+      const authPassword = el("authPassword");
+      const authError = el("authError");
+
       const reqModal = el("reqModal");
       const btnRequest = el("btnRequest");
       const reqClose = el("reqClose");
@@ -543,18 +596,35 @@
       const reqComments = el("reqComments");
 
       const htmlEl = document.documentElement;
-      const themeBtn = document.getElementById("themeToggle");
+      const themeBtn = el("themeToggle");
 
       let items = [];
       let activeFilter = "";
+      let stashSessionId = null; // Session ID for stash operations
+      let pendingStashAction = null; // Store pending stash action
+      const MAX_TOASTS = 3; // Maximum number of toasts to show at once
 
-      function toast(msg) {
+      function toast(msg, isError = false) {
         const wrap = el("toasts");
+
+        // Remove excess toasts if there are too many
+        const existingToasts = wrap.querySelectorAll(".toast-item");
+        if (existingToasts.length >= MAX_TOASTS) {
+          existingToasts[0].remove();
+        }
+
         const t = document.createElement("div");
-        t.className = "rounded-xl chip text-sm px-3 py-2 shadow";
+        t.className = `toast-item rounded-xl chip text-sm px-3 py-2 shadow ${
+          isError ? "chip-expired" : "chip-live"
+        }`;
+        t.style.animation = "slideIn 0.3s ease";
         t.textContent = msg;
         wrap.appendChild(t);
-        setTimeout(() => t.remove(), 1800);
+
+        setTimeout(() => {
+          t.style.animation = "slideOut 0.2s ease";
+          setTimeout(() => t.remove(), 200);
+        }, 2000);
       }
 
       function badge(bucket) {
@@ -609,9 +679,9 @@
           .map((r) => {
             const actionBtn =
               r.bucket === "Expired"
-                ? `<button class="px-3 py-1.5 rounded-lg btn-ghost brd-ctl" onclick="stash('${r.bundle_id}', true)">Move to Stashed</button>`
+                ? `<button class="px-3 py-1.5 rounded-lg btn-ghost brd-ctl" onclick="requestStash('${r.bundle_id}', true)">Move to Stashed</button>`
                 : r.bucket === "Stashed / Unused"
-                ? `<button class="px-3 py-1.5 rounded-lg btn-ghost brd-ctl" onclick="stash('${r.bundle_id}', false)">Unstash</button>`
+                ? `<button class="px-3 py-1.5 rounded-lg btn-ghost brd-ctl" onclick="requestStash('${r.bundle_id}', false)">Unstash</button>`
                 : `<span class="text-muted">—</span>`;
             return `
           <tr class="row-hover">
@@ -632,11 +702,8 @@
 
         (isActiveTab ? tbodyActive : tbodyStashed).innerHTML =
           rows ||
-          `
-        <tr><td colspan="8" class="px-4 py-8 text-center text-muted">No apps found.</td></tr>
-      `;
+          `<tr><td colspan="8" class="px-4 py-8 text-center text-muted">No apps found.</td></tr>`;
 
-        // Fill request dropdown with ALL apps
         reqApp.innerHTML = items
           .map(
             (i) =>
@@ -645,25 +712,118 @@
           .join("");
       }
 
-      // Expose stash globally (used in onclick)
-      window.stash = async (bundleId, state) => {
-        const r = await fetch("/api/stash", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ bundle_id: bundleId, stashed: !!state }),
-        });
-        if (!r.ok) {
-          toast("Action failed");
+      // Auth modal functions
+      function openAuthModal() {
+        authModal.classList.remove("hidden");
+        authModal.classList.add("flex");
+        authPassword.value = "";
+        authError.classList.add("hidden");
+        authPassword.focus();
+      }
+
+      function closeAuthModal() {
+        authModal.classList.add("hidden");
+        authModal.classList.remove("flex");
+        pendingStashAction = null;
+      }
+
+      async function verifyPassword() {
+        const password = authPassword.value.trim();
+        if (!password) {
+          authError.textContent = "Please enter a password";
+          authError.classList.remove("hidden");
           return;
         }
-        const data = await r.json();
-        toast(
-          data?.item?.bucket === "Stashed / Unused"
-            ? "Moved to Stashed"
-            : "Unstashed"
-        );
-        await load();
+
+        try {
+          const r = await fetch("/api/verify-stash", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ password }),
+          });
+
+          if (r.ok) {
+            const data = await r.json();
+            stashSessionId = data.sessionId;
+            closeAuthModal();
+            toast("✓ Authenticated successfully");
+
+            // Execute pending action
+            if (pendingStashAction) {
+              const { bundleId, state } = pendingStashAction;
+              await performStash(bundleId, state);
+            }
+          } else {
+            authError.textContent = "Invalid password. Please try again.";
+            authError.classList.remove("hidden");
+            authPassword.value = "";
+            authPassword.focus();
+          }
+        } catch (err) {
+          authError.textContent = "Authentication failed. Please try again.";
+          authError.classList.remove("hidden");
+        }
+      }
+
+      // Request stash - check if authenticated
+      window.requestStash = async function (bundleId, state) {
+        if (!stashSessionId) {
+          // No session, show auth modal
+          pendingStashAction = { bundleId, state };
+          openAuthModal();
+        } else {
+          // Already authenticated, perform action
+          await performStash(bundleId, state);
+        }
       };
+
+      // Perform the actual stash operation
+      async function performStash(bundleId, state) {
+        try {
+          const r = await fetch("/api/stash", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              bundle_id: bundleId,
+              stashed: !!state,
+              sessionId: stashSessionId,
+            }),
+          });
+
+          if (r.status === 401) {
+            // Session expired, clear it and show auth modal
+            stashSessionId = null;
+            toast("Session expired. Please authenticate again.", true);
+            pendingStashAction = { bundleId, state };
+            openAuthModal();
+            return;
+          }
+
+          if (!r.ok) {
+            toast("Action failed", true);
+            return;
+          }
+
+          const data = await r.json();
+          const msg =
+            data?.item?.bucket === "Stashed / Unused"
+              ? "Moved to Stashed"
+              : "Unstashed";
+
+          // Only show toast, don't reload immediately to prevent stacking
+          toast(msg);
+
+          // Update the specific item in the local state
+          const itemIndex = items.findIndex((i) => i.bundle_id === bundleId);
+          if (itemIndex !== -1 && data?.item) {
+            items[itemIndex] = data.item;
+            updateStats();
+            renderTable();
+          }
+        } catch (err) {
+          toast("Network error. Please try again.", true);
+        }
+      }
 
       async function refreshNow() {
         refreshBtn.disabled = true;
@@ -682,41 +842,34 @@
         renderTable();
       }
 
-      // Tabs
       function showActive() {
-        // Active Tab → green
         tabActive.classList.add("active-active");
         tabStashed.classList.remove("active-stashed");
         tabStashed.classList.remove("active-active");
-
         tabActive.classList.add("bg-panel", "border", "brd-ctl");
         tabStashed.classList.remove("bg-panel", "border", "brd-ctl");
         tabActive.classList.remove("text-muted");
         tabStashed.classList.add("text-muted");
-
         panelActive.classList.remove("hidden");
         panelStashed.classList.add("hidden");
         filters.classList.remove("hidden");
         renderTable();
       }
+
       function showStashed() {
-        // Stashed Tab → grey
         tabStashed.classList.add("active-stashed");
         tabActive.classList.remove("active-active");
         tabActive.classList.remove("active-stashed");
-
         tabStashed.classList.add("bg-panel", "border", "brd-ctl");
         tabActive.classList.remove("bg-panel", "border", "brd-ctl");
         tabStashed.classList.remove("text-muted");
         tabActive.classList.add("text-muted");
-
         panelStashed.classList.remove("hidden");
         panelActive.classList.add("hidden");
         filters.classList.add("hidden");
         renderTable();
       }
 
-      // Filter pills
       function activatePill(elm) {
         document.querySelectorAll(".pill").forEach((p) => {
           p.classList.remove("active");
@@ -727,7 +880,6 @@
         renderTable();
       }
 
-      // THEME TOGGLE
       function applyTheme(t) {
         if (t === "dark") {
           htmlEl.classList.add("dark");
@@ -737,61 +889,21 @@
           themeBtn.textContent = "🌙 Dark";
         }
       }
+
       const savedTheme = localStorage.getItem("sx_theme") || "light";
       applyTheme(savedTheme);
-      themeBtn.addEventListener("click", () => {
-        const next = htmlEl.classList.contains("dark") ? "light" : "dark";
-        localStorage.setItem("sx_theme", next);
-        applyTheme(next);
-      });
 
-      // Modal handlers
-      // const btnRequest = document.getElementById('btnRequest');
       function openReq() {
         reqModal.classList.remove("hidden");
+        reqModal.classList.add("flex");
         reqComments.value = "";
         reqEmail.value = "";
       }
+
       function closeReq() {
         reqModal.classList.add("hidden");
+        reqModal.classList.remove("flex");
       }
-
-      document
-        .querySelectorAll(".pill")
-        .forEach((p) =>
-          p.addEventListener("click", (e) => activatePill(e.currentTarget))
-        );
-      tabActive.addEventListener("click", showActive);
-      tabStashed.addEventListener("click", showStashed);
-      refreshBtn.addEventListener("click", refreshNow);
-      search.addEventListener(
-        "input",
-        debounce(() => renderTable(), 150)
-      );
-
-      btnRequest.addEventListener("click", openReq);
-      reqClose.addEventListener("click", closeReq);
-      reqCancel.addEventListener("click", closeReq);
-      reqSend.addEventListener("click", async () => {
-        const bundle_id = reqApp.value;
-        const comments = (reqComments.value || "").trim();
-        const requester = (reqEmail.value || "").trim();
-        if (!bundle_id || !comments) {
-          toast("Select an app and add comments");
-          return;
-        }
-        const r = await fetch("/api/request", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ bundle_id, comments, requester }),
-        });
-        if (!r.ok) {
-          toast("Failed to send request");
-          return;
-        }
-        toast("Request sent");
-        closeReq();
-      });
 
       function debounce(fn, ms) {
         let t;
@@ -801,7 +913,61 @@
         };
       }
 
-      // init
+      // Event listeners
+      document
+        .querySelectorAll(".pill")
+        .forEach((p) =>
+          p.addEventListener("click", (e) => activatePill(e.currentTarget))
+        );
+
+      tabActive.addEventListener("click", showActive);
+      tabStashed.addEventListener("click", showStashed);
+      refreshBtn.addEventListener("click", refreshNow);
+      search.addEventListener(
+        "input",
+        debounce(() => renderTable(), 150)
+      );
+
+      // Auth modal
+      authClose.addEventListener("click", closeAuthModal);
+      authCancel.addEventListener("click", closeAuthModal);
+      authSubmit.addEventListener("click", verifyPassword);
+      authPassword.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") verifyPassword();
+      });
+
+      // Request modal
+      btnRequest.addEventListener("click", openReq);
+      reqClose.addEventListener("click", closeReq);
+      reqCancel.addEventListener("click", closeReq);
+      reqSend.addEventListener("click", async () => {
+        const bundle_id = reqApp.value;
+        const comments = (reqComments.value || "").trim();
+        const requester = (reqEmail.value || "").trim();
+        if (!bundle_id || !comments) {
+          toast("Select an app and add comments", true);
+          return;
+        }
+        const r = await fetch("/api/request", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ bundle_id, comments, requester }),
+        });
+        if (!r.ok) {
+          toast("Failed to send request", true);
+          return;
+        }
+        toast("Request sent");
+        closeReq();
+      });
+
+      themeBtn.addEventListener("click", () => {
+        const next = htmlEl.classList.contains("dark") ? "light" : "dark";
+        localStorage.setItem("sx_theme", next);
+        applyTheme(next);
+      });
+
+      // Initialize
       showActive();
       load();
     </script>
